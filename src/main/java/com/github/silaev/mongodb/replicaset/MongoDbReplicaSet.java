@@ -1,6 +1,7 @@
 package com.github.silaev.mongodb.replicaset;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerCmd;
 import com.github.dockerjava.api.model.Capability;
 import com.github.dockerjava.api.model.HostConfig;
 import com.github.dockerjava.api.model.Info;
@@ -48,6 +49,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -127,6 +129,7 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
     private final Map<String, Pair<GenericContainer, MongoSocketAddress>> supplementaryNodeStore;
     private final Map<MongoSocketAddress, Pair<Boolean, GenericContainer>> disconnectedNodeStore;
     private final Network network;
+    private final Consumer<CreateContainerCmd> withCreateContainerCmdModifier;
 
     @Builder
     @SuppressWarnings("unused")
@@ -140,7 +143,8 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
         final Integer slaveDelayTimeout,
         final Integer slaveDelayNumber,
         final Boolean useHostDockerInternal,
-        final List<String> commandLineOptions
+        final List<String> commandLineOptions,
+        final Consumer<CreateContainerCmd> withCreateContainerCmdModifier
     ) {
         val propertyConverter =
             new UserInputToApplicationPropertiesConverter();
@@ -166,6 +170,7 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
         this.disconnectedNodeStore = new ConcurrentHashMap<>();
         this.toxyNodeStore = new ConcurrentHashMap<>();
         this.network = Network.newNetwork();
+        this.withCreateContainerCmdModifier = withCreateContainerCmdModifier;
     }
 
     /**
@@ -177,6 +182,7 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
      * @param disconnectedNodeStore
      * @param toxyNodeStore
      * @param network
+     * @param withCreateContainerCmdModifier
      */
     MongoDbReplicaSet(
         final StringToMongoRsStatusConverter statusConverter,
@@ -184,7 +190,8 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
         Map<String, Pair<GenericContainer, MongoSocketAddress>> supplementaryNodeStore,
         Map<MongoSocketAddress, Pair<Boolean, GenericContainer>> disconnectedNodeStore,
         Map<MongoSocketAddress, ToxiproxyContainer.ContainerProxy> toxyNodeStore,
-        Network network
+        Network network,
+        Consumer<CreateContainerCmd> withCreateContainerCmdModifier
     ) {
         val propertyConverter =
             new UserInputToApplicationPropertiesConverter();
@@ -199,6 +206,7 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
         this.disconnectedNodeStore = disconnectedNodeStore;
         this.toxyNodeStore = toxyNodeStore;
         this.network = network;
+        this.withCreateContainerCmdModifier = withCreateContainerCmdModifier;
     }
 
     @Override
@@ -949,13 +957,18 @@ public class MongoDbReplicaSet implements Startable, AutoCloseable {
         ).toArray(String[]::new);
         final GenericContainer mongoDbContainer = new GenericContainer<>(
             properties.getMongoDockerImageName()
-        ).withNetwork(getReplicaSetNumber() == 1 ? null : network)
+        )
+            .withNetwork(getReplicaSetNumber() == 1 ? null : network)
             .withExposedPorts(MONGO_DB_INTERNAL_PORT)
             .withCommand(commands)
-            .waitingFor(
-                Wait.forListeningPort()
-            ).withStartupTimeout(Duration.ofSeconds(60))
+            .waitingFor(Wait.forListeningPort())
+            .withStartupTimeout(Duration.ofSeconds(60))
             .withStartupAttempts(3);
+
+        if (this.withCreateContainerCmdModifier != null) {
+            //noinspection unchecked
+            mongoDbContainer.withCreateContainerCmdModifier(this.withCreateContainerCmdModifier);
+        }
         if (addExtraHost) {
             mongoDbContainer.withExtraHost(DOCKER_HOST_INTERNAL, "host-gateway");
         }

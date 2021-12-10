@@ -51,7 +51,8 @@ class MongoDbReplicaSetTest {
                 new HashMap<>(),
                 new HashMap<>(),
                 new HashMap<>(),
-                mock(Network.class)
+                mock(Network.class),
+                (cmd) -> {}
             ));
     }
 
