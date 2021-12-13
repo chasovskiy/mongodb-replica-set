@@ -21,7 +21,7 @@ plugins {
 
 apply from: "$rootDir/gradle/jacoco.gradle"
 
-group = 'com.github.silaev'
+group = 'com.github.chasovskiy'
 version = '0.4.3'
 
 repositories {
