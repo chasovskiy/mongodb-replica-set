@@ -1,70 +1,70 @@
 name: build
 
 on:
-    push:
-        branches: [ master ]
-    pull_request: {}
+  push:
+    branches: [ master ]
+  pull_request: {}
 
 jobs:
-    build:
-        runs-on: ubuntu-18.04
-        strategy:
-            fail-fast: false
-            matrix:
-                cfg:
-                    - { mongodb-version: '3.6.14', use-host-docker-internal: false }
-                    - { mongodb-version: '4.0.10', use-host-docker-internal: false }
-                    - { mongodb-version: '4.2.8', use-host-docker-internal: false }
-                    - { mongodb-version: '4.4.4', use-host-docker-internal: false }
-                    - { mongodb-version: '4.4.4', use-host-docker-internal: true }
+  build:
+    runs-on: ubuntu-18.04
+    strategy:
+        fail-fast: false
+        matrix:
+            cfg:
+                - { mongodb-version: '3.6.14', use-host-docker-internal: false }
+                - { mongodb-version: '4.0.10', use-host-docker-internal: false }
+                - { mongodb-version: '4.2.8', use-host-docker-internal: false }
+                - { mongodb-version: '4.4.4', use-host-docker-internal: false }
+                - { mongodb-version: '4.4.4', use-host-docker-internal: true }
 
-        steps:
-            - uses: actions/checkout@v2
-            - uses: actions/cache@v2
-              with:
-                  path: |
-                      ~/.gradle/caches
-                      ~/.gradle/wrapper
-                  key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-                  restore-keys: |
-                      ${{ runner.os }}-gradle-
-            - name: Set up JDK 1.8
-              uses: actions/setup-java@v1
-              with:
-                  java-version: 1.8
-            - name: Add dockerhost to OS host file
-              if: ${{ !matrix.cfg.use-host-docker-internal }}
-              run: sudo echo "127.0.0.1 dockerhost" | sudo tee -a /etc/hosts
-            - name: Add host.docker.internal to OS host file
-              if: ${{ matrix.cfg.use-host-docker-internal }}
-              run: sudo echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
-            - name: Grant execute permission for gradlew
-              run: chmod +x gradlew
-            - name: Build with Gradle agains host, mongodb-version ${{ matrix.cfg.mongodb-version }}
-              run: |
-                  ./gradlew clean build --no-daemon \
-                  -DmongoReplicaSetProperties.mongoDockerImageName=mongo:${{ matrix.cfg.mongodb-version }} \
-                  -DmongoReplicaSetProperties.useHostDockerInternal=${{ matrix.cfg.use-host-docker-internal }}
-            - name: Build with Gradle in docker-only mode ${{ matrix.cfg.mongodb-version }}
-              env:
-                  MONGO_VERSION: ${{ matrix.cfg.mongodb-version }}
-                  USE_HOST_DOCKER_INTERNAL: ${{ matrix.cfg.use-host-docker-internal }}
-              run: |
-                  docker-compose -f docker-compose-it-test.yml up -d;
-                  docker wait run-it-test-mongodb-replica-set;
-                  docker logs run-it-test-mongodb-replica-set;
-                  if [[ $(docker inspect run-it-test-mongodb-replica-set --format='{{.State.ExitCode}}') == '1' ]]; then
-                  echo $(docker inspect run-it-test-mongodb-replica-set --format='{{json .State}}');
-                  exit 1;
-                  fi
-            - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@v1
-              with:
-                  verbose: false # optional (default = false)
-              if: ${{ success() }}
-            - name: Cleanup Gradle Cache
-                # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
-                # Restoring these files from a GitHub Actions cache might cause problems for future builds.
-              run: |
-                  rm -f ~/.gradle/caches/modules-2/modules-2.lock
-                  rm -f ~/.gradle/caches/modules-2/gc.properties
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+    - name: Set up JDK 1.8
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+    - name: Add dockerhost to OS host file
+      if: ${{ !matrix.cfg.use-host-docker-internal }}
+      run: sudo echo "127.0.0.1 dockerhost" | sudo tee -a /etc/hosts
+    - name: Add host.docker.internal to OS host file
+      if: ${{ matrix.cfg.use-host-docker-internal }}
+      run: sudo echo "127.0.0.1 host.docker.internal" | sudo tee -a /etc/hosts
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+    - name: Build with Gradle agains host, mongodb-version ${{ matrix.cfg.mongodb-version }}
+      run: |
+        ./gradlew clean build --no-daemon \
+        -DmongoReplicaSetProperties.mongoDockerImageName=mongo:${{ matrix.cfg.mongodb-version }} \
+        -DmongoReplicaSetProperties.useHostDockerInternal=${{ matrix.cfg.use-host-docker-internal }}
+    - name: Build with Gradle in docker-only mode ${{ matrix.cfg.mongodb-version }}
+      env:
+          MONGO_VERSION: ${{ matrix.cfg.mongodb-version }}
+          USE_HOST_DOCKER_INTERNAL: ${{ matrix.cfg.use-host-docker-internal }}
+      run: |
+        docker-compose -f docker-compose-it-test.yml up -d;
+        docker wait run-it-test-mongodb-replica-set;
+        docker logs run-it-test-mongodb-replica-set;
+        if [[ $(docker inspect run-it-test-mongodb-replica-set --format='{{.State.ExitCode}}') == '1' ]]; then
+        echo $(docker inspect run-it-test-mongodb-replica-set --format='{{json .State}}');
+        exit 1;
+        fi
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v1
+      with:
+        verbose: false # optional (default = false)
+      if: ${{ success() }}
+    - name: Cleanup Gradle Cache
+        # Remove some files from the Gradle cache, so they aren't cached by GitHub Actions.
+        # Restoring these files from a GitHub Actions cache might cause problems for future builds.
+      run: |
+          rm -f ~/.gradle/caches/modules-2/modules-2.lock
+          rm -f ~/.gradle/caches/modules-2/gc.properties

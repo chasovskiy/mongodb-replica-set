@@ -124,7 +124,7 @@ task delombok(type: DelombokTask) {
 shadowJar {
     //https://github.com/johnrengelman/shadow/issues/463
     classifier = ''
-    relocate 'org.yaml.snakeyaml', 'com.github.chasovskiy.mongodb.replicaset.shaded'
+    relocate 'org.yaml.snakeyaml', 'com.github.silaev.mongodb.replicaset.shaded'
     dependencies {
         include(dependency('org.yaml:snakeyaml'))
     }
@@ -207,9 +207,9 @@ publishing {
                     }
                 }
                 scm {
-                    url = 'https://github.com/chasovskiy/mongodb-replica-set/'
-                    connection = 'scm:git:git://github.com/chasovskiy/mongodb-replica-set.git'
-                    developerConnection = 'scm:git:ssh://git@github.com/chasovskiy/mongodb-replica-set.git'
+                    url = 'https://github.com/silaev/mongodb-replica-set/'
+                    connection = 'scm:git:git://github.com/silaev/mongodb-replica-set.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/silaev/mongodb-replica-set.git'
                 }
             }
 
